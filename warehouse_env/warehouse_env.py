@@ -59,6 +59,9 @@ class WarehouseEnv(gym.Env):
                 return True
         return False
 
+    def assign_goal(self, agent, goal):
+        self.agent_goal[agent] = goal
+
     def step(self, agent, action):
         row, col = self.agent_state[agent]
         R, C = self.agent_map.shape
@@ -77,7 +80,10 @@ class WarehouseEnv(gym.Env):
         if not self._occupied(*s_prime):
             self.agent_state[agent] = s_prime
         observation = self._observe(agent)
-        reward = self.agent_state[agent] == self.agent_goal[agent]
+        reward = 0
+        if self.agent_state[agent] == self.agent_goal[agent]:
+            reward = 1
+            self.agent_goal[agent] = None
         done = False
         return observation, reward, done, {}
 
