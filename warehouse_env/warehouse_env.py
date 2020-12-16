@@ -14,7 +14,7 @@ class Action(Enum):
 
 
 class WarehouseEnv(gym.Env):
-    def __init__(self, obstacle_map, agent_map, max_timestep=1000):
+    def __init__(self, obstacle_map, agent_map, max_timestep=200):
         super().__init__()
         assert obstacle_map.size == agent_map.size
 
