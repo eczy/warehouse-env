@@ -48,7 +48,7 @@ class WarehouseEnv(gym.Env):
         self.current_agent_id = 0
         self.num_agents = np.unique(self.agent_map).shape[0] - 1
         
-        self.obs_shape = [self.agent_map.shape[0], self.agent_map.shape[1], 3]
+        self.obs_shape = [self.agent_map.shape[0], self.agent_map.shape[1], 5]
         self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
 
     def _observe(self, agent_id=None):
@@ -59,23 +59,41 @@ class WarehouseEnv(gym.Env):
         
         goal = self.agent_goal[agent]
         state = self.agent_state[agent]
-
+        
         agent_channel = np.zeros_like(self.agent_map)
         agent_channel[state] = 1
         other_agent_channel = np.zeros_like(self.agent_map)
         for k, v in self.agent_state.items():
             if k != agent:
-                other_agent_channel[v] = k+2
+                other_agent_channel[v] = 1
+        goal_channel = np.zeros_like(self.goal_map)
+        goal_channel[goal] = 1
+        other_goal_channel = np.zeros_like(self.goal_map)
         
-        agent_channel[goal] = 1
         for k, v in self.agent_goal.items():
             if k != agent:
-                other_agent_channel[v] = k+2
-        
+                other_goal_channel[v] = 1
         return np.stack(
-            [agent_channel, other_agent_channel, self.obstacle_map],
+            [agent_channel, other_agent_channel, goal_channel, other_goal_channel, self.obstacle_map],
             axis=0,
         ).transpose((1, 2, 0))
+    
+#         agent_channel = np.zeros(self.obs_shape)
+#         agent_channel[state] = 1
+#         other_agent_channel = np.zeros(self.obs_shape)
+#         for k, v in self.agent_state.items():
+#             if k != agent:
+#                 other_agent_channel[v] = k+2
+        
+#         agent_channel[goal] = 1
+#         for k, v in self.agent_goal.items():
+#             if k != agent:
+#                 other_agent_channel[v[0], v[1]+1] = k+2
+        
+#         return np.stack(
+#             [agent_channel, other_agent_channel, self.obstacle_map],
+#             axis=0,
+#         ).transpose((1, 2, 0))
 
     def _occupied(self, row, col):
         if self.obstacle_map[row, col] != 0:
