@@ -14,7 +14,7 @@ class Action(Enum):
 
 
 class WarehouseEnv(gym.Env):
-    def __init__(self, obstacle_map, agent_map, max_timestep=200):
+    def __init__(self, obstacle_map, agent_map, max_timestep=None):
         super().__init__()
         assert obstacle_map.size == agent_map.size
 
@@ -155,7 +155,10 @@ class WarehouseEnv(gym.Env):
         self.timestep += 1
         self.current_agent_id = (self.current_agent_id + 1) % self.num_agents
         
-        done = True if self.timestep <= self.max_timestep else False
+        if self.max_timestep is None:
+            done = False
+        else:
+            done = True if self.timestep <= self.max_timestep else False
         return observation, reward, done, {}
     
     def get_new_goal_location(self, excluding_location=None):
