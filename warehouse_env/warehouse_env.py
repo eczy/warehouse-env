@@ -111,6 +111,8 @@ class WarehouseEnv(gym.Env):
     def step(self, action, agent_id=None):
         if agent_id is None:
             agent = self.current_agent_id
+        else:
+            agent = agent_id
             
 #         action = self.action_space_map[action] if isinstance(action, int) else action
 #         print(action, action == Action.NOOP, action == Action.RIGHT, 
