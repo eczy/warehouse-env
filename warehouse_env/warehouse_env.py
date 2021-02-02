@@ -63,16 +63,21 @@ class WarehouseEnv(gym.Env):
         agent_channel = np.zeros_like(self.agent_map)
         agent_channel[state] = 1
         other_agent_channel = np.zeros_like(self.agent_map)
+        current_key = 1
         for k, v in self.agent_state.items():
             if k != agent:
-                other_agent_channel[v] = 1
+                current_key += 1
+                other_agent_channel[v] = current_key
+        
         goal_channel = np.zeros_like(self.goal_map)
         goal_channel[goal] = 1
         other_goal_channel = np.zeros_like(self.goal_map)
-        
+        current_key = 1
         for k, v in self.agent_goal.items():
             if k != agent:
-                other_goal_channel[v] = 1
+                current_key += 1
+                other_goal_channel[v] += current_key
+        
         return np.stack(
             [agent_channel, other_agent_channel, goal_channel, other_goal_channel, self.obstacle_map],
             axis=0,
@@ -81,14 +86,16 @@ class WarehouseEnv(gym.Env):
 #         agent_channel = np.zeros(self.obs_shape)
 #         agent_channel[state] = 1
 #         other_agent_channel = np.zeros(self.obs_shape)
+#         current_key = 1
 #         for k, v in self.agent_state.items():
 #             if k != agent:
-#                 other_agent_channel[v] = k+2
+#                 current_key += 1
+#                 other_agent_channel[v] = current_key
         
 #         agent_channel[goal] = 1
 #         for k, v in self.agent_goal.items():
 #             if k != agent:
-#                 other_agent_channel[v[0], v[1]+1] = k+2
+#                 other_agent_channel[v] = current_key
         
 #         return np.stack(
 #             [agent_channel, other_agent_channel, self.obstacle_map],
@@ -137,7 +144,6 @@ class WarehouseEnv(gym.Env):
             self.agent_state[agent] = s_prime
         else:
             reward = -0.2
-        observation = self._observe(agent_id=agent)
         reward = 0
         if self.agent_state[agent] == self.agent_goal[agent]:
             reward = 5
@@ -154,6 +160,7 @@ class WarehouseEnv(gym.Env):
                 
             self.assign_goal(agent, new_goal_location)
         
+        observation = self._observe(agent_id=agent)
         self.timestep += 1
         self.current_agent_id = (self.current_agent_id + 1) % self.num_agents
         
@@ -186,7 +193,7 @@ class WarehouseEnv(gym.Env):
         self.current_agent_id = 0
         return self._observe()
 
-    def render(self, mode="human", zoom_size=8, agent_id=None, other_agents_same=False):
+    def render(self, mode="human", zoom_size=4, agent_id=None, other_agents_same=False):
         image_array = np.zeros_like(self.agent_map)
         # Map agents, agent_id will mapped to 1
         for k, v in self.agent_state.items():
@@ -223,7 +230,7 @@ class WarehouseEnv(gym.Env):
                 else:
                     if not other_agents_same:
                         image_array_copy2[(x-inner_box_size):(x+inner_box_size), 
-                                          (y-inner_box_size):(y+inner_box_size)] = k+2
+                                          (y-inner_box_size):(y+inner_box_size)] += k+2
                     else:
                         image_array_copy2[(x-inner_box_size):(x+inner_box_size), 
                                           (y-inner_box_size):(y+inner_box_size)] = 2
