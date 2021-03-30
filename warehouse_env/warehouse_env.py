@@ -14,7 +14,7 @@ class Action(Enum):
 
 
 class WarehouseEnv(gym.Env):
-    def __init__(self, obstacle_map, agent_map, max_timestep=None):
+    def __init__(self, obstacle_map, agent_map, max_timestep=None, render_as_observation=False):
         super().__init__()
         assert obstacle_map.size == agent_map.size
 
@@ -48,14 +48,24 @@ class WarehouseEnv(gym.Env):
         self.current_agent_id = 0
         self.num_agents = np.unique(self.agent_map).shape[0] - 1
         
-        self.obs_shape = [self.agent_map.shape[0], self.agent_map.shape[1], 5]
-        self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
+        self.render_as_observation = render_as_observation
+        self.zoom_observation_size = 4
+        if self.render_as_observation:
+            self.obs_shape = np.array(self.render(zoom_size=self.zoom_observation_size))[:,:,:-1].shape
+            self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
+        else:
+            self.obs_shape = [self.agent_map.shape[0], self.agent_map.shape[1], 5]
+            self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
 
     def _observe(self, agent_id=None):
+        
         if agent_id is None:
             agent = self.current_agent_id
         else:
             agent = agent_id
+        
+        if self.render_as_observation:
+            return np.array(self.render(zoom_size=4, agent_id=agent))[:,:,:-1]
         
         goal = self.agent_goal[agent]
         state = self.agent_state[agent]
