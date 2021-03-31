@@ -16,11 +16,15 @@ class Action(Enum):
 
 
 class WarehouseEnv(gym.Env):
+<<<<<<< HEAD
     def __init__(self, obstacle_map, agent_map, 
                  max_timestep=None, 
                  render_as_observation=False, 
                  coordinated_planner=False,
                  local_obseration_size=(11,11)):
+=======
+    def __init__(self, obstacle_map, agent_map, max_timestep=None, render_as_observation=False):
+>>>>>>> 04ac21a259bd0ec8f038022b7ba4b150eff44031
         super().__init__()
         assert obstacle_map.size == agent_map.size
 
@@ -54,6 +58,7 @@ class WarehouseEnv(gym.Env):
         self.current_agent_id = 0
         self.num_agents = np.count_nonzero(self.agent_map)
         
+<<<<<<< HEAD
         self.local_observation_width = int(np.floor(local_obseration_size[0]/2.0))
         self.local_observation_length = int(np.floor(local_obseration_size[1]/2.0))
         self.local_obs_shape = local_obseration_size
@@ -132,6 +137,16 @@ class WarehouseEnv(gym.Env):
                     counter += 1
             except:
                 coordinated_planner = False
+=======
+        self.render_as_observation = render_as_observation
+        self.zoom_observation_size = 4
+        if self.render_as_observation:
+            self.obs_shape = np.array(self.render(zoom_size=self.zoom_observation_size))[:,:,:-1].shape
+            self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
+        else:
+            self.obs_shape = [self.agent_map.shape[0], self.agent_map.shape[1], 5]
+            self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
+>>>>>>> 04ac21a259bd0ec8f038022b7ba4b150eff44031
 
         if not coordinated_planner:
             location = env.agent_state[agent_id]
@@ -214,10 +229,17 @@ class WarehouseEnv(gym.Env):
             agent = agent_id
         
         if self.render_as_observation:
+<<<<<<< HEAD
             im_output = self.render(zoom_size=4, agent_id=agent, local=True)
             return np.array(self.render(zoom_size=4, agent_id=agent))[:,:,:-1]
         
         local_agent_state, local_agent_goal, local_obstacles = self.local_observation(agent, self.local_obs_shape)
+=======
+            return np.array(self.render(zoom_size=4, agent_id=agent))[:,:,:-1]
+        
+        goal = self.agent_goal[agent]
+        state = self.agent_state[agent]
+>>>>>>> 04ac21a259bd0ec8f038022b7ba4b150eff44031
         
         goal = local_agent_goal[agent]
         state = local_agent_state[agent]
