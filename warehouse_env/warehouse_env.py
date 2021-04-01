@@ -81,7 +81,7 @@ class WarehouseEnv(gym.Env):
         else:
 #             local_agent_state, local_agent_goal, local_obstacles = \
 #                             self.local_observation(agent, self.local_obs_shape)
-            self.obs_shape = [local_obseration_size, local_obseration_size, 5]
+            self.obs_shape = [local_obseration_size[0], local_obseration_size[1], 5]
             self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
             
 
