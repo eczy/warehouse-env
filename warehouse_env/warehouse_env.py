@@ -20,22 +20,29 @@ class WarehouseEnv(gym.Env):
                  max_timestep=None, 
                  render_as_observation=False, 
                  coordinated_planner=False,
-                 local_obseration_size=(11,11)):
+                 local_obseration_size=(11,11),
+                 goal_generator=None,
+                 delta_tolling=True,
+                 delta_tolling_r=0.5,
+                 delta_tolling_b=4.0):
         super().__init__()
         assert obstacle_map.size == agent_map.size
-
-        self.agent_state = {}
-        self.agent_goal = {}
-        rows, cols = np.nonzero(agent_map)
-        for i, (row, col) in enumerate(zip(rows, cols)):
-            self.agent_state[i] = (row, col)
-            self.agent_goal[i] = None
-
-        self.n_agents = len(self.agent_state)
+        
         self.obstacle_map = obstacle_map
         self.agent_map = agent_map
         self.goal_map = np.zeros_like(agent_map)
         self.action_space = spaces.Discrete(5)
+        
+        self.agent_state = {}
+        self.agent_goal = {}
+        rows, cols = np.nonzero(agent_map)
+        for i, (row, col) in enumerate(zip(rows, cols)):
+            if self._occupied(row, col):
+                raise ValueError("Cannot instantiate agent where obstacle exists.")
+            self.agent_state[i] = (row, col)
+            self.agent_goal[i] = None
+
+        self.n_agents = len(self.agent_state)
         
         action_space_map = {}
         action_space_map[0] = Action.RIGHT
@@ -47,12 +54,15 @@ class WarehouseEnv(gym.Env):
         
         self.max_timestep = max_timestep
         self.timestep = 0
-        
-        for agent_id in self.agent_goal.keys():
-            self.assign_goal(agent_id, self.get_new_goal_location())
-            
         self.current_agent_id = 0
         self.num_agents = np.count_nonzero(self.agent_map)
+        
+        self.goal_generator = goal_generator
+        if self.goal_generator is not None:
+            self.goal_generator.set_env(self)
+        
+        for agent_id in self.agent_goal.keys():
+            self.assign_goal(agent_id, self.get_new_goal_location(agent_id=agent_id, reset=True))
         
         self.local_observation_width = int(np.floor(local_obseration_size[0]/2.0))
         self.local_observation_length = int(np.floor(local_obseration_size[1]/2.0))
@@ -70,8 +80,9 @@ class WarehouseEnv(gym.Env):
             
         self.update_network_edges()
         
-        self.R = 1e-5 # np.ones(self.obs_shape) * 1e-4
-        self.beta = 4.0 * self.num_agents # np.ones(self.obs_shape) * 4
+        self.delta_tolling = delta_tolling
+        self.R = delta_tolling_r # np.ones(self.obs_shape) * 1e-4
+        self.beta = delta_tolling_b * self.num_agents # np.ones(self.obs_shape) * 4
         
         self.coordinated_planner = coordinated_planner
         
@@ -256,8 +267,8 @@ class WarehouseEnv(gym.Env):
         return False
 
     def assign_goal(self, agent, goal):
-        if self._occupied(goal[0], goal[1]):
-            raise ValueError("Attempting to assign goal to occupied location: {}, {}.".format(agent, goal))
+        if self.obstacle_map[goal] != 0:
+            raise ValueError("Attempting to assign goal to a location with an obstacel: {}, {}.".format(agent, goal))
         self.agent_goal[agent] = goal
 
     def step(self, action, agent_id=None):
@@ -296,22 +307,31 @@ class WarehouseEnv(gym.Env):
             reward = -0.2
         
         edge = ((new_loc[0], new_loc[1]), (old_loc[0], old_loc[1]))
-        self.toll_map[edge] =  self.R * self.beta * delta + (1 - self.R) * self.toll_map[edge]
         
+        if self.delta_tolling:
+            if edge in self.toll_map:
+                self.toll_map[edge] =  self.R * self.beta * delta + (1 - self.R) * self.toll_map[edge]
+            for other_edge in self.env_graph.edges:
+                new_value = self.R * self.beta * 0.0 + (1 - self.R) * self.toll_map[other_edge]
+                new_value = 0.1 if new_value <= 0.1 else new_value
+                self.toll_map[other_edge] =  self.R * self.beta * 0.0 + (1 - self.R) * self.toll_map[other_edge]
+            self.update_network_edges()
+            
         reward = 0
         if self.agent_state[agent] == self.agent_goal[agent]:
             reward = 5
             # Lazy retry, fix me
-            new_goal_location_occupied = True
-            while_count = 0
-            while new_goal_location_occupied:
-                while_count += 1
-                new_goal_location = self.get_new_goal_location(excluding_location=self.agent_goal[agent])
-                if not self._occupied(new_goal_location[0], new_goal_location[1]):
-                    new_goal_location_occupied = False
-                if while_count > 800:
-                    raise ValueError("Probably in an infinite while loop.")
-                
+#             new_goal_location_occupied = True
+#             while_count = 0
+#             while new_goal_location_occupied:
+#                 while_count += 1
+#                 new_goal_location = self.get_new_goal_location(excluding_location=self.agent_goal[agent])
+#                 if not self._occupied(new_goal_location[0], new_goal_location[1]):
+#                     new_goal_location_occupied = False
+#                 if while_count > 800:
+#                     raise ValueError("Probably in an infinite while loop.")
+                    
+            new_goal_location = self.get_new_goal_location(agent_id=agent_id)
             self.assign_goal(agent, new_goal_location)
         
         observation = self._observe(agent_id=agent)
@@ -324,10 +344,20 @@ class WarehouseEnv(gym.Env):
             done = True if self.timestep <= self.max_timestep else False
         return observation, reward, done, {}
     
-    def get_new_goal_location(self, excluding_location=None):
+    def get_new_goal_location(self, agent_id=None, reset=False):
+        if self.goal_generator is not None:
+            if agent_id is None:
+                agent_id = self.current_agent_id
+            if reset:
+                return self.goal_generator.get_reset_location(agent_id)
+            else:
+                return self.goal_generator.get_new_location(agent_id)
+        else:
+            # default to random goal generator
+            return self.get_random_location()
+            
+    def get_random_location(self):
         obstacle_map_copy = self.obstacle_map.copy()
-        if excluding_location is not None:
-            obstacle_map_copy[excluding_location] = 1
         empty_locations = np.argwhere((self.agent_map == 0) & (obstacle_map_copy == 0))
         choice_location = np.random.choice(empty_locations.shape[0])
         x, y = empty_locations[choice_location]
@@ -342,12 +372,12 @@ class WarehouseEnv(gym.Env):
             self.agent_goal[i] = None
             
         for agent_id in self.agent_goal.keys():
-            self.assign_goal(agent_id, self.get_new_goal_location())
+            self.assign_goal(agent_id, self.get_new_goal_location(agent_id=agent_id, reset=True))
             
         self.current_agent_id = 0
         return self._observe()
 
-    def render(self, mode="human", zoom_size=4, agent_id=None, local=True):
+    def render(self, mode="human", zoom_size=4, agent_id=None, local=True, draw_grid=False):
         if local:
             if agent_id is None:
                 agent_id = self.current_agent_id
@@ -409,7 +439,12 @@ class WarehouseEnv(gym.Env):
                 agent_y = int((agent_y * zoom_size) + zoom_size/2) 
                 image_array_copy2[(agent_x-smaller_box_size):(agent_x+smaller_box_size), 
                                   (agent_y-smaller_box_size):(agent_y+smaller_box_size)] = max_agent_id + 5
-
+        
+        if draw_grid:
+            for i in range(0,image_array_copy2.shape[0],zoom_size):
+                image_array_copy2[i:i+1,:] = max_agent_id + 6
+                image_array_copy2[:,i:i+1] = max_agent_id + 6
+            
         scalar_cm = cm.ScalarMappable(cmap="jet_r")
         color_array = np.uint8(scalar_cm.to_rgba(image_array_copy2)*255)
 
@@ -418,6 +453,7 @@ class WarehouseEnv(gym.Env):
         color_array[(image_array_copy2 == (max_agent_id + 3))] = [0,0,0,255]
         color_array[(image_array_copy2 == (max_agent_id + 4))] = [255,255,255,255]
         color_array[(image_array_copy2 == (max_agent_id + 5))] = [255,255,255,255]
+        color_array[(image_array_copy2 == (max_agent_id + 6))] = [255,255,255,255]
 
         if agent_id is not None:
             color_array[(image_array_copy2 == 1)] = [255,0,0,255]
