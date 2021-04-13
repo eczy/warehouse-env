@@ -5,6 +5,8 @@ from enum import Enum
 from PIL import Image
 from matplotlib import cm
 
+from .map_generator import MapGenerator
+
 class Action(Enum):
     RIGHT = 0
     UP = 1
@@ -253,6 +255,28 @@ class WarehouseEnv(gym.Env):
     
     def close(self):
         pass
+
+class PseudorandomWarehouseEnv(WarehouseEnv):
+    def __init__(self, H, W, scale, n_agents, noise_thresh=0.75, seed_fn=None, max_timestep=None):
+        self.map_generator = MapGenerator(H, W, scale, seed_fn)
+        self.noise_thresh = noise_thresh
+        self.n_agents = n_agents
+        self.max_timestep = max_timestep
+        self.reset()
+
+    def reset(self):
+        obstacle_map, agent_map = self._new_map()
+        super().__init__(obstacle_map, agent_map, max_timestep=self.max_timestep)
+    
+    def _new_map(self):
+        new_map = self.map_generator(threshold=self.noise_thresh)
+        nonobs_x, nonobs_y = np.nonzero(~new_map)
+        agent_loc_indices = np.random.choice(np.arange(len(nonobs_x)), size=self.n_agents, replace=False)
+        agent_locations = [(nonobs_x[x], nonobs_y[x]) for x in agent_loc_indices]
+        agent_map = np.zeros_like(new_map)
+        for x, y in agent_locations:
+            agent_map[x, y] = 1
+        return new_map, agent_map
 
 class WarehouseEnvRuntimeError(Exception):
     def __init__(self, message, errors):
