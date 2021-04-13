@@ -1,0 +1,6 @@
+exp_result/*
+__pycache__/*
+build/*
+
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
