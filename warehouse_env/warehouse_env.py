@@ -443,7 +443,8 @@ class WarehouseEnv(gym.Env):
                                   (agent_y-smaller_box_size):(agent_y+smaller_box_size)] = max_agent_id + 5
         
         if draw_grid:
-            for i in range(0,image_array_copy2.shape[0],zoom_size):
+            longest_shape = np.maximum(image_array_copy2.shape[0], image_array_copy2.shape[1])
+            for i in range(0,longest_shape,zoom_size):
                 image_array_copy2[i:i+1,:] = max_agent_id + 6
                 image_array_copy2[:,i:i+1] = max_agent_id + 6
             
