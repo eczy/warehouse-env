@@ -239,20 +239,29 @@ class WarehouseEnv(gym.Env):
         agent_channel = np.zeros_like(local_agent_map)
         agent_channel[state] = 1
         other_agent_channel = np.zeros_like(local_agent_map)
-        current_key = 1
-        for k, v in local_agent_state.items():
-            if k != agent:
-                current_key += 1
-                other_agent_channel[v] = current_key
         
         goal_channel = np.zeros_like(local_goal_map)
         goal_channel[goal] = 1
         other_goal_channel = np.zeros_like(local_goal_map)
-        current_key = 1
-        for k, v in local_agent_goal.items():
-            if k != agent:
-                current_key += 1
-                other_goal_channel[v] += current_key
+        
+        agent_color_map = {}
+        if agent_id is not None:
+            agent_color_map[goal] = 1
+            
+        current_color_map_counter = 2
+        for agent, agent_loc in local_agent_state.items():
+            assigned_color = None
+            agent_goal_loc = local_agent_goal[agent]
+            if agent_goal_loc in agent_color_map:
+                assigned_color = agent_color_map[agent_goal_loc]
+            else:
+                agent_color_map[agent_goal_loc] = current_color_map_counter
+                assigned_color = current_color_map_counter
+                current_color_map_counter += 1
+
+            other_agent_channel[agent_loc] = assigned_color
+            other_goal_channel[goal] = assigned_color
+                
         
         return np.stack(
             [agent_channel, other_agent_channel, goal_channel, other_goal_channel, local_obstacles],
