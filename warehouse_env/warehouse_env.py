@@ -26,7 +26,9 @@ class WarehouseEnv(gym.Env):
                  goal_generator=None,
                  delta_tolling=True,
                  delta_tolling_r=0.5,
-                 delta_tolling_b=4.0):
+                 delta_tolling_b=4.0,
+                 random_agent_reset_location=False,
+                 exponential_agent_training_curve=False):
         super().__init__()
         assert obstacle_map.size == agent_map.size
         
@@ -58,6 +60,7 @@ class WarehouseEnv(gym.Env):
         self.timestep = 0
         self.current_agent_id = 0
         self.num_agents = np.count_nonzero(self.agent_map)
+        self.random_agent_reset_location = random_agent_reset_location
         
         self.goal_generator = goal_generator
         if self.goal_generator is not None:
@@ -96,6 +99,9 @@ class WarehouseEnv(gym.Env):
 #                             self.local_observation(agent, self.local_obs_shape)
             self.obs_shape = [local_obseration_size[0], local_obseration_size[1], 5]
             self.observation_space = spaces.Box(low=0, high=255, shape=self.obs_shape, dtype=np.uint8)
+        
+        self.exponential_agent_training_curve = exponential_agent_training_curve
+        self.reset_counter = 0
             
 
     def warehouse_to_graph(self):
@@ -236,13 +242,13 @@ class WarehouseEnv(gym.Env):
         goal = local_agent_goal[agent]
         state = local_agent_state[agent]
         
-        agent_channel = np.zeros_like(local_agent_map)
+        agent_channel = np.zeros_like(local_obstacles)
         agent_channel[state] = 1
-        other_agent_channel = np.zeros_like(local_agent_map)
+        other_agent_channel = np.zeros_like(local_obstacles)
         
-        goal_channel = np.zeros_like(local_goal_map)
+        goal_channel = np.zeros_like(local_obstacles)
         goal_channel[goal] = 1
-        other_goal_channel = np.zeros_like(local_goal_map)
+        other_goal_channel = np.zeros_like(local_obstacles)
         
         agent_color_map = {}
         if agent_id is not None:
@@ -373,14 +379,25 @@ class WarehouseEnv(gym.Env):
         choice_location = np.random.choice(empty_locations.shape[0])
         x, y = empty_locations[choice_location]
         return (x, y)
+    
+    def num_agents_training_curve(self, reset_count):
+        return 2**(reset_count/5000)
         
     def reset(self):
+        self.reset_counter += 1
+        
         self.agent_state = {}
         self.agent_goal = {}
-        rows, cols = np.nonzero(self.agent_map)
-        for i, (row, col) in enumerate(zip(rows, cols)):
-            self.agent_state[i] = (row, col)
-            self.agent_goal[i] = None
+        
+        if self.exponential_agent_training_curve:
+            for i in np.arange(self.num_agents_training_curve(self.reset_counter)):
+                self.agent_state[i] = self.get_random_location()
+                self.agent_goal[i] = None
+        else:
+            rows, cols = np.nonzero(self.agent_map)
+            for i, (row, col) in enumerate(zip(rows, cols)):
+                self.agent_state[i] = self.get_random_location() if self.random_agent_reset_location else (row, col) 
+                self.agent_goal[i] = None
             
         for agent_id in self.agent_goal.keys():
             self.assign_goal(agent_id, self.get_new_goal_location(agent_id=agent_id, reset=True))
