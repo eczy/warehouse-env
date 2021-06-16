@@ -26,7 +26,7 @@ class WarehouseEnv(gym.Env):
                  goal_generator=None,
                  delta_tolling=True,
                  delta_tolling_r=0.5,
-                 delta_tolling_b=4.0,
+                 delta_tolling_b=4.0, 
                  random_agent_reset_location=False,
                  exponential_agent_training_curve=False):
         super().__init__()
@@ -102,7 +102,9 @@ class WarehouseEnv(gym.Env):
         
         self.exponential_agent_training_curve = exponential_agent_training_curve
         self.reset_counter = 0
-            
+        
+        self.goals_reached = 0.0
+
 
     def warehouse_to_graph(self):
         env = self
@@ -336,6 +338,7 @@ class WarehouseEnv(gym.Env):
             
         reward = 0
         if self.agent_state[agent] == self.agent_goal[agent]:
+            self.goals_reached += 1.0
             reward = 5
             # Lazy retry, fix me
 #             new_goal_location_occupied = True
